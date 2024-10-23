@@ -31,3 +31,20 @@ Moving company data set (files can be found at 'dags/scripts/data_examples' fold
 
 ## Getting started
 To get started with Airflow check the [getting started](docs/getting_started.md) documentation.
+
+# Project Solution
+
+## Overview
+In this project, my goal was to automate a data pipeline proccess that could extract, transform and load (ETL) data 
+from multiple datasets into a PostgreSQL database. The structure of the pipeline is:
+- dag airflow orchestrates the execution of the etl proccess
+- raw schema: stores raw data only with typing transformations
+- curated schema: stores transformed, aggregated and refined data ready for analysis
+- jupyter notebook contains example of analysis that could be created with input of the analyst
+- sentiment analysis using afinn
+
+## Next Steps
+Some opportunities for improvements would be:
+- Add a data lake step, where we could load raw and transformed data, leaving the database only for refined data
+- Add dbt to transform and catalog data/tables
+- Improve analysis made, adding more enriched algorithms or even creating graphs to showcase the data

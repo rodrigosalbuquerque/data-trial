@@ -3,39 +3,72 @@ from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 
+from scripts.clever_main_pipeline import customer_reviews_google_to_raw, company_profiles_google_maps_to_raw, \
+    company_reviews_to_curated, fmcsa_companies_to_raw, fmcsa_complaints_to_raw, fmcsa_company_snapshot_to_raw, \
+    fmcsa_safer_data_to_raw
+
 default_args = {
     "owner": "alec.ventura",
     "start_date": datetime(2024, 10, 1),
 }
 
-datasets = [
-    'fmcsa_complaints.csv',
-    'fmcsa_safer_data.csv',
-    'fmcsa_company_snapshot.csv',
-    'fmcsa_companies.csv',
-    'customer_reviews_google.csv',
-    'company_profiles_google_maps.csv'
-
-]
-
 with DAG("clever_main_DAG", default_args=default_args, catchup=False, schedule_interval='20 0 * * *', max_active_runs=1) as dag:
 
-    start_task = EmptyOperator(task_id='Start', dag=dag)
-    finish_task = EmptyOperator(task_id='Finish', dag=dag)
+    start_task = EmptyOperator(task_id='start_task', dag=dag)
 
-    for file in datasets:
-        file_without_extension = file.split('.')[0]
+    raw_company_profiles_google_maps_task = PythonOperator(
+        task_id='company_profiles_google_maps_to_raw',
+        python_callable=company_profiles_google_maps_to_raw,
+        dag=dag,
+        execution_timeout=timedelta(minutes=5)
+    )
 
-        task_id = f"upload_to_postgres_{file_without_extension}"
-        upload_to_postgres_task = PythonOperator(
-            task_id=task_id,
-            python_callable=upload_to_postgres,
-            dag=dag,
-            execution_timeout=timedelta(milliseconds=2),
-            op_kwargs={
-                "file_name": file
-            }
-        )
+    raw_customer_reviews_google_task = PythonOperator(
+        task_id='customer_reviews_google_to_raw',
+        python_callable=customer_reviews_google_to_raw,
+        dag=dag,
+        execution_timeout=timedelta(minutes=5)
+    )
 
-        start_task.set_downstream(upload_to_postgres_task)
-        upload_to_postgres_task.set_downstream(finish_task)
+    curated_company_reviews_task = PythonOperator(
+        task_id='company_reviews_to_curated',
+        python_callable=company_reviews_to_curated,
+        dag=dag,
+        execution_timeout=timedelta(minutes=5)
+    )
+
+    raw_fmcsa_companies_task = PythonOperator(
+        task_id='fmcsa_companies_to_raw',
+        python_callable=fmcsa_companies_to_raw,
+        dag=dag,
+        execution_timeout=timedelta(minutes=5)
+    )
+
+    raw_fmcsa_complaints_task = PythonOperator(
+        task_id='fmcsa_complaints_to_raw',
+        python_callable=fmcsa_complaints_to_raw,
+        dag=dag,
+        execution_timeout=timedelta(minutes=5)
+    )
+
+    raw_fmcsa_company_snapshot_task = PythonOperator(
+        task_id='fmcsa_company_snapshot_to_raw',
+        python_callable=fmcsa_company_snapshot_to_raw,
+        dag=dag,
+        execution_timeout=timedelta(minutes=5)
+    )
+
+    raw_fmcsa_safer_data_task = PythonOperator(
+        task_id='fmcsa_safer_data_to_raw',
+        python_callable=fmcsa_safer_data_to_raw,
+        dag=dag,
+        execution_timeout=timedelta(minutes=5)
+    )
+
+    finish_task = EmptyOperator(task_id='finish_task', dag=dag)
+
+    start_task >> [raw_company_profiles_google_maps_task, raw_customer_reviews_google_task, raw_fmcsa_companies_task,
+                   raw_fmcsa_complaints_task, raw_fmcsa_company_snapshot_task, raw_fmcsa_safer_data_task]
+    [raw_company_profiles_google_maps_task, raw_customer_reviews_google_task] >> curated_company_reviews_task
+    [raw_fmcsa_companies_task, raw_fmcsa_complaints_task, raw_fmcsa_company_snapshot_task, raw_fmcsa_safer_data_task] >> finish_task
+    curated_company_reviews_task >> finish_task
